@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: golearn
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: golearn
+  template:
+    metadata:
+      labels:
+        app: golearn
+    spec:
+      serviceAccountName: event-watcher-sa
+      containers:
+        - name: golearn
+          image: golearn  # Use the same image name you built
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: ENV
+              value: "kubernetes"
+          ports:
+            - containerPort: 8080
