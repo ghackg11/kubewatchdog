@@ -1,125 +1,141 @@
-# KubeWatch
+# Kubernetes Event Monitor
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/yourorg/kubewatch)](https://goreportcard.com/report/github.com/yourorg/kubewatch)
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+A Go-based CLI tool for monitoring and querying Kubernetes events with PostgreSQL storage and real-time event tracking.
 
-A lightweight command-line tool for real-time monitoring of Kubernetes events and database changes.
+## Features
 
-## Overview
+- **Real-time Event Monitoring**: Watch and store Kubernetes events in real-time
+- **Event Querying**: Query events for specific resources with customizable time windows
+- **Resource Discovery**: List available Kubernetes resource types (core and API groups)
+- **PostgreSQL Integration**: Store and query events from a PostgreSQL database
+- **Case-insensitive Search**: Flexible resource name matching
 
-KubeWatch provides comprehensive visibility into your Kubernetes clusters and associated databases. By tracking both Kubernetes resource events and database modifications in real-time, it helps developers and DevOps teams maintain system stability and respond quickly to potential issues.
+## Prerequisites
 
-### Key Features
-
-- **Real-time Kubernetes event monitoring** for pods, deployments, services, and more
-- **Database change tracking** with TimescaleDB integration
-- **Simple CLI interface** built with Cobra for intuitive command execution
-- **Low resource footprint** for efficient operation in production environments
-- **Docker support** for easy deployment and integration with CI/CD pipelines
+- Go 1.23 or later
+- PostgreSQL database
+- Kubernetes cluster access (local or in-cluster)
+- kubectl configured with cluster access
 
 ## Installation
 
-### Using Go
-
+1. Clone the repository:
 ```bash
-go install github.com/yourorg/kubewatch@latest
+git clone <repository-url>
+cd <repository-name>
 ```
 
-### Using Docker
+2. Install dependencies:
+```bash
+go mod download
+```
+
+3. Set up PostgreSQL database:
+```sql
+CREATE DATABASE kubewatchdog;
+\c kubewatchdog
+CREATE TABLE kubernetes_events (
+    id TEXT,
+    event_time TIMESTAMPTZ NOT NULL,
+    event_type TEXT,
+    reason TEXT,
+    message TEXT,
+    namespace TEXT,
+    resource TEXT,
+    resource_name TEXT,
+    PRIMARY KEY (id, event_time)
+);
+
+SELECT create_hypertable('kubernetes_events', 'event_time');
+```
+
+## Configuration
+
+Set environment variables for different environments:
 
 ```bash
-docker pull yourorg/kubewatch:latest
-docker run -it --rm yourorg/kubewatch --help
+# For local development
+export ENV=local
+
+# For Kubernetes cluster
+export ENV=kubernetes
 ```
 
 ## Usage
 
-### Basic Commands
+### List Available Resource Types
 
 ```bash
-# Start monitoring Kubernetes events
-kubewatch k8s --namespace=default
+# List core resource types
+go run main.go list
 
-# Monitor database changes
-kubewatch db --connection="postgres://user:password@localhost:5432/dbname"
-
-# Monitor both Kubernetes and database events
-kubewatch watch --namespace=default --connection="postgres://user:password@localhost:5432/dbname"
-
-# Get help
-kubewatch --help
+# List all resource types including API groups
+go run main.go list --all
 ```
 
-### Configuration
-
-KubeWatch can be configured using either command-line flags or a configuration file:
+### Get Events for a Resource
 
 ```bash
-# Using a config file
-kubewatch --config=/path/to/config.yaml
+# Get events for a specific resource in the last 10 minutes
+go run main.go get <resource-type> <resource-name>
 
-# Sample config.yaml
-kubernetes:
-  namespace: default
-  resources:
-    - pods
-    - deployments
-    - services
-database:
-  connection: "postgres://user:password@localhost:5432/dbname"
-  tables:
-    - users
-    - products
+# Examples
+go run main.go get pod my-pod
+go run main.go get deployment my-deployment
 ```
 
-## Technical Details
+### Start Event Monitoring
 
-KubeWatch is built with Go and follows a modular architecture:
+```bash
+# Start watching and storing Kubernetes events
+go run main.go watch
+```
 
-- **CLI Package**: Handles command-line interactions using the Cobra package
-- **Core Package**: Contains the main logic for Kubernetes event tracking and database monitoring
-- **Kubernetes Integration**: Uses client-go to establish event watchers on Kubernetes resources
-- **Database Monitoring**: Integrates with TimescaleDB via GORM for efficient time-series data tracking
+## Database Schema
+
+The `kubernetes_events` table stores the following information:
+- `id`: Unique identifier for the event
+- `event_time`: Timestamp when the event occurred
+- `event_type`: Type of the event
+- `reason`: Event reason (e.g., Created, Scheduled, Started)
+- `message`: Detailed event message
+- `namespace`: Kubernetes namespace where the event occurred
+- `resource`: Type of the Kubernetes resource
+- `resource_name`: Name of the Kubernetes resource
+
+The table uses TimescaleDB's hypertable feature for efficient time-series data storage.
 
 ## Development
 
-### Prerequisites
+### Project Structure
 
-- Go 1.18+
-- Docker (for containerized development)
-- Access to a Kubernetes cluster (or minikube for local development)
-- TimescaleDB instance
-
-### Building from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/yourorg/kubewatch.git
-cd kubewatch
-
-# Build the binary
-go build -o kubewatch main.go
-
-# Run tests
-go test ./...
+```
+.
+├── src/
+│   ├── k8s.go           # Kubernetes client and event handling
+│   └── phi2_client.go   # LLM client for additional features
+├── cli/
+│   └── cmd/
+│       ├── get.go       # Get events command
+│       ├── list.go      # List resources command
+│       └── watch.go     # Watch events command
+└── main.go              # Main application entry point
 ```
 
-### Docker Build
+### Adding New Commands
 
-```bash
-docker build -t yourorg/kubewatch:latest .
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Create a new command file in `cli/cmd/`
+2. Define the command using cobra
+3. Add the command to the root command in `main.go`
 
 ## License
 
-This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
+[Your License Here]
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
