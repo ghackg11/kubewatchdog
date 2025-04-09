@@ -15,8 +15,8 @@ spec:
       serviceAccountName: event-watcher-sa
       containers:
         - name: golearn
-          image: golearn  # Use the same image name you built
-          imagePullPolicy: IfNotPresent
+          image: gautammmb/golearn:1.0.1  # Use the same image name you built
+          imagePullPolicy: Always
           env:
             - name: ENV
               value: "kubernetes"
