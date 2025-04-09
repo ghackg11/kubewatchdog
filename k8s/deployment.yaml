@@ -15,7 +15,7 @@ spec:
       serviceAccountName: event-watcher-sa
       containers:
         - name: golearn
-          image: gautammmb/golearn:1.0.1  # Use the same image name you built
+          image: gautammmb/golearn:1.0.2  # Use the same image name you built
           imagePullPolicy: Always
           env:
             - name: ENV

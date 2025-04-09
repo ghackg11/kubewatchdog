@@ -3,10 +3,13 @@ package src
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	v1 "k8s.io/api/core/v1"
 	"log"
 	"os"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func ConnectToDB() *pgx.Conn {
@@ -52,4 +55,45 @@ func saveEventToDB(conn *pgx.Conn, ev *v1.Event) {
 		fmt.Printf("Saved event: %s - %s\n", ev.Reason, ev.Message)
 	}
 
+}
+
+func GetResourceEvents(conn *pgx.Conn, resourceType, resourceName string) ([]v1.Event, error) {
+	query := `
+		SELECT resource, resource_name, reason, message, event_time
+		FROM kubernetes_events
+		WHERE LOWER(resource) = LOWER($1)
+		AND LOWER(resource_name) = LOWER($2)
+		AND event_time >= NOW() - INTERVAL '10 minutes'
+		ORDER BY event_time DESC
+	`
+
+	rows, err := conn.Query(context.Background(), query, resourceType, resourceName)
+	if err != nil {
+		return nil, fmt.Errorf("error querying events: %v", err)
+	}
+	defer rows.Close()
+
+	var events []v1.Event
+	for rows.Next() {
+		var event v1.Event
+		var eventTime time.Time
+		err := rows.Scan(
+			&event.InvolvedObject.Kind,
+			&event.InvolvedObject.Name,
+			&event.Reason,
+			&event.Message,
+			&eventTime,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error scanning event: %v", err)
+		}
+		event.EventTime.Time = metav1.NewTime(eventTime).Time
+		events = append(events, event)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating events: %v", err)
+	}
+
+	return events, nil
 }

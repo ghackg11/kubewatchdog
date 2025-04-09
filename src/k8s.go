@@ -3,15 +3,17 @@ package src
 import (
 	"context"
 	"fmt"
-	"github.com/jackc/pgx/v5"
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 	"log"
 	"os"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 func LoadK8sConfig() *rest.Config {
@@ -62,4 +64,35 @@ func WatchEvents(clientset *kubernetes.Clientset, conn *pgx.Conn) {
 		saveEventToDB(conn, ev)
 	}
 	defer conn.Close(context.Background())
+}
+
+func ListK8sResourceTypes(clientset *kubernetes.Clientset, showAll bool) ([]string, error) {
+	// Get server resources
+	resourceList, err := clientset.Discovery().ServerPreferredResources()
+	if err != nil {
+		return nil, fmt.Errorf("error getting server resources: %v", err)
+	}
+
+	var resourceTypes []string
+	for _, group := range resourceList {
+		for _, resource := range group.APIResources {
+			gv, err := schema.ParseGroupVersion(group.GroupVersion)
+			if err != nil {
+				continue
+			}
+
+			// Skip non-core resources unless showAll is true
+			if !showAll && gv.Group != "" {
+				continue
+			}
+
+			resourceName := resource.Name
+			if gv.Group != "" {
+				resourceName = fmt.Sprintf("%s.%s", resource.Name, gv.Group)
+			}
+			resourceTypes = append(resourceTypes, resourceName)
+		}
+	}
+
+	return resourceTypes, nil
 }
